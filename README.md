@@ -29,7 +29,7 @@ Each .c and .h file must have a standard header as defined below.  Make sure to 
 
 ```
 /**************************************************************
-* Class::  CSC-415-0# Spring 2024
+* Class::  CSC-415-01 Summer 2024
 * Name::
 * Student IDs::
 * GitHub-Name::
