@@ -107,15 +107,15 @@ void initializeRootDirectory(uint64_t blockSize) {
     entries[0].group_id = 0;
     entries[0].file_attributes = ATTR_DIRECTORY;
 
-    // Parent directory (..)
+    //Parent directory
     strcpy(entries[1].file_name, "..");
     entries[1].creation_timestamp = time(NULL);
     entries[1].modification_timestamp = time(NULL);
     entries[1].last_access_timestamp = time(NULL);
-    entries[1].starting_block = 6; // Example value, adjust as needed
+    entries[1].starting_block = 6;
     entries[1].file_size_bytes = rootDirSize;
-    entries[1].owner_id = 0; // Example value, adjust as needed
-    entries[1].group_id = 0; // Example value, adjust as needed
+    entries[1].owner_id = 0;
+    entries[1].group_id = 0;
     entries[1].file_attributes = ATTR_DIRECTORY;
 
     //Write root directory to disk.
