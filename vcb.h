@@ -16,9 +16,9 @@
 #ifndef VCB_H
 #define VCB_H
 
-#include <stdint.h>  // Fixed-width integer types
+#include <stdint.h>
 
-// Define a unique signature for a valid VCB
+//Define a signature.
 #define VCB_SIGNATURE 0x5262742042ULL
 
 typedef struct {

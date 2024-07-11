@@ -36,6 +36,23 @@ typedef u_int64_t uint64_t;
 typedef u_int32_t uint32_t;
 #endif
 
+
+#define ATTR_DIRECTORY 0x01
+#define ATTR_READ_ONLY 0x02
+
+typedef struct directoryEntry {
+    char file_name[256];                // Name of the file or directory (null-terminated string)
+    uint64_t creation_timestamp;        // Time of creation
+    uint64_t modification_timestamp;    // Time of last modification
+    uint64_t last_access_timestamp;     // Time of last access
+    uint32_t starting_block;            // Block number where the file starts
+    uint32_t file_size_bytes;           // Size of the file in bytes
+    uint32_t owner_id;                  // User ID of the file owner
+    uint32_t group_id;                  // Group ID of the file owner
+    uint32_t file_attributes;           // Attributes of the file (e.g., directory, read-only)
+} directoryEntry;
+
+
 // This structure is returned by fs_readdir to provide the caller with information
 // about each file as it iterates through a directory
 struct fs_diriteminfo

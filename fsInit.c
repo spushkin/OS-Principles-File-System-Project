@@ -84,6 +84,42 @@ void initializeFreeSpace(uint64_t blockSize) {
 	free(freeSpace);
 }
 
+//Initialize root directory.
 void initializeRootDirectory(uint64_t blockSize) {
+	//Calculate size of root directory.
+	uint64_t rootDirSize = 6 * blockSize;
+	//Allocate memory for root directory.
+    void *rootDir = malloc(rootDirSize);
+	//Initialize root directory
+	memset(rootDir, 0, rootDirSize);
+	//Cast directory entries to a directory entry array.
+	directoryEntry *entries = (directoryEntry *)rootDir;
+    
+    strcpy(entries[0].file_name, ".");
+	//Set timefields to the current time.
+    entries[0].creation_timestamp = time(NULL);
+    entries[0].modification_timestamp = time(NULL);
+    entries[0].last_access_timestamp = time(NULL);
+	//Assign the proper values.
+    entries[0].starting_block = 6;
+    entries[0].file_size_bytes = rootDirSize;
+    entries[0].owner_id = 0;
+    entries[0].group_id = 0;
+    entries[0].file_attributes = ATTR_DIRECTORY;
 
+    // Parent directory (..)
+    strcpy(entries[1].file_name, "..");
+    entries[1].creation_timestamp = time(NULL);
+    entries[1].modification_timestamp = time(NULL);
+    entries[1].last_access_timestamp = time(NULL);
+    entries[1].starting_block = 6; // Example value, adjust as needed
+    entries[1].file_size_bytes = rootDirSize;
+    entries[1].owner_id = 0; // Example value, adjust as needed
+    entries[1].group_id = 0; // Example value, adjust as needed
+    entries[1].file_attributes = ATTR_DIRECTORY;
+
+    //Write root directory to disk.
+    LBAwrite(rootDir, 6, 6);
+	//Free the memory.
+    free(rootDir);
 }
