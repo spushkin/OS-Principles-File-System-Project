@@ -1,54 +1,76 @@
+/**************************************************************
+* Class::  CSC-415-01 Summer 2024
+* Name:: Yahya Obeid, Siarhei Pushkin, Philip Karnatsevich
+* Student IDs:: 922368561, 922907437, 922912455
+* GitHub-Name:: yahyaobeid, spushkin, kapitoshcka
+* Group-Name:: Team of 3
+* Project:: Basic File System
+*
+* File:: fsInit.c
+*
+* Description:: Main driver for file system assignment.
+*
+* This file is where you will start and initialize your system
+*
+**************************************************************/
+
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <stdio.h>
 #include <string.h>
+
 #include "fsLow.h"
 #include "mfs.h"
 #include "vcb.h"
 
+void initializeVCB(uint64_t numberOfBlocks, uint64_t blockSize);
+void initializeFreeSpace(uint64_t blockSize);
+void initializeRootDirectory(uint64_t blockSize);
+
 int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize) {
     printf("Initializing File System with %ld blocks with a block size of %ld\n", numberOfBlocks, blockSize);
     
-    // Allocate memory for the Volume Control Block (VCB)
-    VolumeControlBlock *vcb = (VolumeControlBlock *)malloc(blockSize);
+    // allocate memory for the VCB
+    VolumeControlBlock *vcb = (VolumeControlBlock *)malloc(blockSize); 
     if (vcb == NULL) {
-        printf("Failed to allocate memory for VCB\n");
+        perror("Failed to allocate memory for VCB");
         return -1;
     }
 
-    // Read first block into memory
-    int readResult = LBAread(vcb, 1, 0);
-    if (readResult != 1) {
-        printf("Failed to read block 0 into VCB\n");
+    //Read first block into memory.
+    if (LBAread(vcb, 1, 0) != 1) {
+        perror("Failed to read VCB from disk");
         free(vcb);
         return -1;
     }
 
-    // Check signature to see if block is already formatted
+    // Check signature to see if block is already formatted.
     if (vcb->signature != VCB_SIGNATURE) {
-        printf("Volume not formatted, starting initialization...\n");
-        
-        // Initialize the VCB
-        initializeVCB(numberOfBlocks, blockSize);
-        printf("VCB initialized successfully\n");
-        
-        // Initialize the free space
-        initializeFreeSpace(blockSize);
-        printf("Free space initialized successfully\n");
-        
-        // Initialize the root directory
-        initializeRootDirectory(blockSize);
-        printf("Root directory initialized successfully\n");
-        
-        // Free the VCB memory and indicate success
+        printf("VCB not found. Formatting the volume.\n");
         free(vcb);
-        return 0;
-    } else {
-        printf("Volume already formatted\n");
+
+        // initialize VCB, Free Space, and Root Directory
+        initializeVCB(numberOfBlocks, blockSize);
+        initializeFreeSpace(blockSize);
+        initializeRootDirectory(blockSize);
+
+        // re-read the VCB to confirm initialization
+        vcb = (VolumeControlBlock *)malloc(blockSize);
+        if (vcb == NULL) {
+            perror("Failed to allocate memory for VCB");
+            return -1;
+        }
+
+        if (LBAread(vcb, 1, 0) != 1 || vcb->signature != VCB_SIGNATURE) {
+            perror("Failed to initialize VCB");
+            free(vcb);
+            return -1;
+        }
     }
 
-    // Free the VCB memory and indicate no formatting needed
+    printf("File system initialized successfully.\n");
     free(vcb);
     return 0;
 }
@@ -57,8 +79,9 @@ void exitFileSystem() {
     printf("System exiting\n");
 }
 
-// Initialize the Volume Control Block
+//Initialize the Volume Control Block
 void initializeVCB(uint64_t numberOfBlocks, uint64_t blockSize) {
+	//Assign the proper values to the first block.
     VolumeControlBlock vcb;
     vcb.signature = VCB_SIGNATURE;
     vcb.blockSizeBytes = blockSize;
@@ -66,72 +89,57 @@ void initializeVCB(uint64_t numberOfBlocks, uint64_t blockSize) {
     vcb.availableBlocks = numberOfBlocks - 6;
     vcb.rootDirectoryBlock = 6;
     vcb.freeSpaceMapBlock = 1;
-    
-    // Write it to the first block
-    int writeResult = LBAwrite(&vcb, 1, 0);
-    if (writeResult != 1) {
-        printf("Failed to write VCB to block 0\n");
-    }
+	//Write it to the first block.
+    LBAwrite(&vcb, 1, 0);
 }
 
 // Initialize the free space
 void initializeFreeSpace(uint64_t blockSize) {
     uint64_t freeSpaceSize = 5 * blockSize;
-    
-    // Allocate memory for the free space map
     void *freeSpace = malloc(freeSpaceSize);
     if (freeSpace == NULL) {
-        printf("Failed to allocate memory for free space map\n");
-        return;
+        perror("Failed to allocate memory for free space map");
+        exit(1);
     }
-
-    // Mark all the blocks as free
     memset(freeSpace, 0, freeSpaceSize);
-
-    // Mark the first 6 blocks as used for the VCB and free space map
+	//Mark the first 6 blocks as used for the VCB and free space map.
     for (int i = 0; i < 6; i++) {
         ((char *)freeSpace)[i / 8] |= (1 << (i % 8));
     }
-
-    // Write the free space map to the disk at block 1
-    int writeResult = LBAwrite(freeSpace, 5, 1);
-    if (writeResult != 5) {
-        printf("Failed to write free space map to disk\n");
-    }
-
-    // Free the memory of the free space map
+	//Write the free space map to the disk at block 1
+    LBAwrite(freeSpace, 5, 1);
+	//Free the memory of the free space map.
     free(freeSpace);
 }
 
 // Initialize root directory
 void initializeRootDirectory(uint64_t blockSize) {
+	//Calculate size of root directory.
     uint64_t rootDirSize = 6 * blockSize;
-    
-    // Allocate memory for root directory
+	//Allocate memory for root directory.
     void *rootDir = malloc(rootDirSize);
     if (rootDir == NULL) {
-        printf("Failed to allocate memory for root directory\n");
-        return;
+        perror("Failed to allocate memory for root directory");
+        exit(1);
     }
-
-    // Initialize root directory
     memset(rootDir, 0, rootDirSize);
-
-    // Cast directory entries to a directory entry array
+	//Cast directory entries to a directory entry array.
     directoryEntry *entries = (directoryEntry *)rootDir;
 
-    // Initialize the "." entry
+    // Current directory (.)
     strcpy(entries[0].file_name, ".");
+	//Set timefields to the current time.
     entries[0].creation_timestamp = time(NULL);
     entries[0].modification_timestamp = time(NULL);
     entries[0].last_access_timestamp = time(NULL);
+	//Assign the proper values.
     entries[0].starting_block = 6;
     entries[0].file_size_bytes = rootDirSize;
     entries[0].owner_id = 0;
     entries[0].group_id = 0;
     entries[0].file_attributes = ATTR_DIRECTORY;
 
-    // Initialize the ".." entry
+    // Parent directory (..)
     strcpy(entries[1].file_name, "..");
     entries[1].creation_timestamp = time(NULL);
     entries[1].modification_timestamp = time(NULL);
@@ -142,12 +150,8 @@ void initializeRootDirectory(uint64_t blockSize) {
     entries[1].group_id = 0;
     entries[1].file_attributes = ATTR_DIRECTORY;
 
-    // Write root directory to disk
-    int writeResult = LBAwrite(rootDir, 6, 6);
-    if (writeResult != 6) {
-        printf("Failed to write root directory to disk\n");
-    }
-
-    // Free the memory
+	//Write root directory to disk.
+    LBAwrite(rootDir, 6, 6);
+	//Free the memory.
     free(rootDir);
 }
