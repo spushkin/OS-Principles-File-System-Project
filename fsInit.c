@@ -33,7 +33,11 @@ directoryEntry *cwd;
 int BLOCKSIZE;
 
 int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize) {
-    VolumeControlBlock *vcpPoint = malloc(blockSize);
+    BLOCKSIZE = blockSize;
+    printf ("Initializing File System with %ld blocks with a block size of %ld\n",
+	numberOfBlocks, blockSize);
+
+    vcpPoint = malloc(blockSize);
     LBAread(vcpPoint, 1, 0);
 
     if(vcpPoint->signature == VCB_SIGNATURE){
@@ -47,8 +51,8 @@ int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize) {
     }
     directoryEntry *root = malloc(blockSize);
     LBAread(root, 1, vcpPoint->rootDirectoryBlock);
-    directoryEntry *rootDirectory = loadDir(root);
-    directoryEntry *currentDir = rootDirectory;
+    rootDirectory = loadDir(root);
+    cwd = rootDirectory;
     LBAwrite(vcpPoint,1,0);
     return 0;
 }
