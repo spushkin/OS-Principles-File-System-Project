@@ -19,7 +19,7 @@
 #include <stdint.h>
 
 //Define a signature.
-#define VCB_SIGNATURE 0x5262742042ULL
+#define VCB_SIGNATURE 4159223
 
 typedef struct {
     uint64_t signature;              // Unique identifier for a valid VCB

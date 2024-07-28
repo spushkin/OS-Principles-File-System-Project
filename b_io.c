@@ -23,6 +23,7 @@
 
 #define MAXFCBS 20
 #define B_CHUNK_SIZE 512
+#define PERMISSIONS (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
 
 typedef struct b_fcb
 	{
@@ -30,6 +31,7 @@ typedef struct b_fcb
 	char * buf;		//holds the open file buffer
 	int index;		//holds the current position in the buffer
 	int buflen;		//holds how many valid bytes are in the buffer
+	int linuxFd;
 	} b_fcb;
 	
 b_fcb fcbArray[MAXFCBS];
@@ -53,7 +55,7 @@ b_io_fd b_getFCB ()
 	{
 	for (int i = 0; i < MAXFCBS; i++)
 		{
-		if (fcbArray[i].buff == NULL)
+		if (fcbArray[i].buf == NULL)
 			{
 			return i;		//Not thread safe (But do not worry about it for this assignment)
 			}
@@ -74,9 +76,22 @@ b_io_fd b_open (char * filename, int flags)
 		
 	if (startup == 0) b_init();  //Initialize our system
 	
-	returnFd = b_getFCB();				// get our own file descriptor
+	returnFd = b_getFCB();
+
+	if (returnFd < 0) return -1;    // no available FCB
+
+    fcbArray[returnFd].buf = malloc(B_CHUNK_SIZE);
+    if (fcbArray[returnFd].buf == NULL) return -1;  // allocation failed
+
+    fcbArray[returnFd].index = 0;
+    fcbArray[returnFd].buflen = 0;
+    fcbArray[returnFd].linuxFd = open(filename, flags, PERMISSIONS);
+    if (fcbArray[returnFd].linuxFd < 0) {
+        free(fcbArray[returnFd].buf);
+        fcbArray[returnFd].buf = NULL;
+        return -1;
+    }				// get our own file descriptor
 										// check for error - all used FCB's
-	
 	return (returnFd);						// all set
 	}
 
@@ -101,17 +116,32 @@ int b_seek (b_io_fd fd, off_t offset, int whence)
 // Interface to write function	
 int b_write (b_io_fd fd, char * buffer, int count)
 	{
-	if (startup == 0) b_init();  //Initialize our system
+	if (startup == 0) b_init();  // Initialize our system
 
-	// check that fd is between 0 and (MAXFCBS-1)
-	if ((fd < 0) || (fd >= MAXFCBS))
-		{
-		return (-1); 					//invalid file descriptor
-		}
-		
-		
-	return (0); //Change this
-	}
+    // check that fd is between 0 and (MAXFCBS-1)
+    if ((fd < 0) || (fd >= MAXFCBS) || (fcbArray[fd].buf == NULL)) {
+        return (-1);  // Invalid file descriptor
+    }
+
+    int bytesWritten = 0;
+    while (count > 0) {
+        int spaceInBuffer = B_CHUNK_SIZE - fcbArray[fd].index;
+        int bytesToWrite = (spaceInBuffer < count) ? spaceInBuffer : count;
+
+        memcpy(fcbArray[fd].buf + fcbArray[fd].index, buffer + bytesWritten, bytesToWrite);
+        fcbArray[fd].index += bytesToWrite;
+        bytesWritten += bytesToWrite;
+        count -= bytesToWrite;
+
+        if (fcbArray[fd].index == B_CHUNK_SIZE) {
+            int bytes = write(fcbArray[fd].linuxFd, fcbArray[fd].buf, B_CHUNK_SIZE);
+            if (bytes != B_CHUNK_SIZE) return -1;  // Write error
+            fcbArray[fd].index = 0;
+        }
+    }
+
+    return bytesWritten;
+}
 
 
 
@@ -137,19 +167,46 @@ int b_write (b_io_fd fd, char * buffer, int count)
 int b_read (b_io_fd fd, char * buffer, int count)
 	{
 
-	if (startup == 0) b_init();  //Initialize our system
+	if (startup == 0) b_init();  // Initialize our system
 
-	// check that fd is between 0 and (MAXFCBS-1)
-	if ((fd < 0) || (fd >= MAXFCBS))
-		{
-		return (-1); 					//invalid file descriptor
-		}
-		
-	return (0);	//Change this
+    // check that fd is between 0 and (MAXFCBS-1)
+    if ((fd < 0) || (fd >= MAXFCBS) || (fcbArray[fd].buf == NULL)) {
+        return (-1);  // Invalid file descriptor
+    }
+
+    int bytesRead = 0;
+    while (count > 0) {
+        if (fcbArray[fd].index == fcbArray[fd].buflen) {
+            fcbArray[fd].buflen = read(fcbArray[fd].linuxFd, fcbArray[fd].buf, B_CHUNK_SIZE);
+            fcbArray[fd].index = 0;
+            if (fcbArray[fd].buflen == 0) break;  // EOF
+            if (fcbArray[fd].buflen < 0) return -1;  // Read error
+        }
+
+        int bytesToCopy = (fcbArray[fd].buflen - fcbArray[fd].index < count) ? fcbArray[fd].buflen - fcbArray[fd].index : count;
+        memcpy(buffer + bytesRead, fcbArray[fd].buf + fcbArray[fd].index, bytesToCopy);
+        fcbArray[fd].index += bytesToCopy;
+        bytesRead += bytesToCopy;
+        count -= bytesToCopy;
+    }
+
+    return bytesRead;
 	}
 	
 // Interface to Close the file	
 int b_close (b_io_fd fd)
 	{
+		if (startup == 0) b_init();  // Initialize our system
 
+    // check that fd is between 0 and (MAXFCBS-1)
+    if ((fd < 0) || (fd >= MAXFCBS) || (fcbArray[fd].buf == NULL)) {
+        return (-1);  // Invalid file descriptor
+    }
+
+    // Free the buffer and close the Linux file descriptor
+    free(fcbArray[fd].buf);
+    fcbArray[fd].buf = NULL;
+    close(fcbArray[fd].linuxFd);
+
+    return 0;  // Success
 	}

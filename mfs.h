@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <time.h>
+#include <initializeDirectories.h>
 
 #include "b_io.h"
 
@@ -36,21 +37,8 @@ typedef u_int64_t uint64_t;
 typedef u_int32_t uint32_t;
 #endif
 
-
 #define ATTR_DIRECTORY 0x01
 #define ATTR_READ_ONLY 0x02
-
-typedef struct directoryEntry {
-    char file_name[256];                // Name of the file or directory (null-terminated string)
-    uint64_t creation_timestamp;        // Time of creation
-    uint64_t modification_timestamp;    // Time of last modification
-    uint64_t last_access_timestamp;     // Time of last access
-    uint32_t starting_block;            // Block number where the file starts
-    uint32_t file_size_bytes;           // Size of the file in bytes
-    uint32_t owner_id;                  // User ID of the file owner
-    uint32_t group_id;                  // Group ID of the file owner
-    uint32_t file_attributes;           // Attributes of the file (e.g., directory, read-only)
-} directoryEntry;
 
 
 // This structure is returned by fs_readdir to provide the caller with information
@@ -105,8 +93,17 @@ struct fs_stat
 	
 	/* add additional attributes here for your file system */
 	};
+typedef struct parentInfo{
+	directoryEntry * parent;
+	char lastElement;
+	int index;
+} parentInfo;
 
 int fs_stat(const char *path, struct fs_stat *buf);
-
+int parsePath(char *path, parentInfo *pInfo);
+directoryEntry* loadDir(directoryEntry* parent);
+int findEntryInDir(directoryEntry* parent, char* name);
+int isDirAtDeEmpty(directoryEntry * dir);
+char* cleanPath(char* path);
 #endif
 
