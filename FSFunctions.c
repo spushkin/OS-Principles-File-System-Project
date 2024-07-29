@@ -20,107 +20,128 @@
 #include "fsLow.h"
 #include "constants.h"
 #define bits 8
+
 int freeSpaceBlocks;
 int totalBits;
 char *freeSpace;
 
+// Set a bit at the given location
 void setBit(int location) {
     freeSpace[location / bits] |= (1 << (location % bits));
 }
 
+// Clear a bit at the given location
 void clearBit(int location) {
-    fsm[location / bits] &= ~(1 << (location % bits));
+    freeSpace[location / bits] &= ~(1 << (location % bits));
 }
 
+// Check if a bit at the given location is set
 int checkBit(int location) {
     return (freeSpace[location / bits] & (1 << (location % bits))) != 0;
 }
 
-void freeFreeSpace(){
+// Free the memory allocated for the free space bitmap
+void freeFreeSpace() {
     free(freeSpace);
 }
 
-void writeFreeSpace(){
+// Write the free space bitmap to disk
+void writeFreeSpace() {
     LBAwrite(freeSpace, freeSpaceBlocks, 1);
 }
 
-void clearBits(int initial, int num){
-    for(int loop=0;loop<num;loop++){
-        clearBit(loop+initial);
+// Clear a range of bits starting from the initial location
+void clearBits(int initial, int num) {
+    for (int loop = 0; loop < num; loop++) {
+        clearBit(loop + initial);
     }
 }
 
+// Initialize the free space bitmap
 int initializeFreeSpace(int numOfBlocks, int blockSize) {
     totalBits = numOfBlocks * blockSize;
+    // Allocate memory for the bitmap
     freeSpace = calloc(numOfBlocks, blockSize);
-    if(freeSpace != NULL) {
-        int bytesToTrack = (numOfBlocks + 7)/8;
-        freeSpaceBlocks = (bytesToTrack+(blockSize-1))/blockSize;
+    if (freeSpace != NULL) {
+        int bytesToTrack = (numOfBlocks + 7) / 8;
+         // Calculate the number of blocks needed
+        freeSpaceBlocks = (bytesToTrack + (blockSize - 1)) / blockSize;
 
-        for (int loop=0;loop<freeSpaceBlocks+1;loop++) {
+        // Mark the blocks used for the bitmap as occupied
+        for (int loop = 0; loop < freeSpaceBlocks + 1; loop++) {
             setBit(loop);
         }
-
+        // Write the bitmap to disk
         LBAwrite(freeSpace, freeSpaceBlocks, 1);
         return 1;
     } else {
-        return -1;
+        return -1; // Return -1 if memory allocation fails
     }
 }
 
+// Load the free space bitmap from disk
 int loadFreeSpace(int numofBlocks, int blockSize) {
     totalBits = numofBlocks * blockSize;
-    int freeSpace = calloc(numofBlocks, blockSize);
-    if(freeSpace != NULL) {
-        int bytesToTrack = (numofBlocks+7)/8;
-        freeSpaceBlocks = (bytesToTrack+(blockSize-1))/blockSize;
-        LBAread(freeSpace, freeSpaceBlocks, 1);
+    // Allocate memory for the bitmap
+    freeSpace = calloc(numofBlocks, blockSize);
+    if (freeSpace != NULL) {
+        int bytesToTrack = (numofBlocks + 7) / 8;
+        // Calculate the number of blocks needed
+        freeSpaceBlocks = (bytesToTrack + (blockSize - 1)) / blockSize;
+        // Read the bitmap from disk
+        LBAread(freeSpace, freeSpaceBlocks, 1); 
         return 1;
-    } else{
-        return -1;
+    } else {
+        return -1; // Return -1 if memory allocation fails
     }
 }
 
+// Allocate blocks of free space
 space *allocateBlocks(int min, int needed) {
     space *spaceArray = malloc(needed * sizeof(space));
-    if(spaceArray == NULL){
+    if (spaceArray == NULL) {
         return NULL;
     }
-    int index=0;
-    int loop=0;
-    int total=0;
+    int index = 0;
+    int loop = 0;
+    int total = 0;
 
-    while(loop<totalBits){
-        if(checkBit(loop) == 1){
-            loop++;
-        }else{
-            int count = 1;
-            int inner = loop+1;
-            while(inner < totalBits && checkBit(inner) != 1 && total + count < needed){
+    // Loop through the bitmap to find free blocks
+    while (loop < totalBits) {
+        if (checkBit(loop) == 1) {
+            loop++; // Skip if the bit is set
+        } else {
+            int count = 1; // Count of contiguous free blocks
+            int inner = loop + 1;
+            // Find contiguous free blocks
+            while (inner < totalBits && checkBit(inner) != 1 && total + count < needed) {
                 count++;
                 inner++;
             }
-            if(count>=min){
+            if (count >= min) {
                 total += count;
-                spaceArray[index].start = loop;
+                spaceArray[index].start = loop; 
                 spaceArray[index].count = count;
                 index++;
             }
-            loop = inner;
-            if(total==needed){
-                break;
+            loop = inner; // Move to the next range
+            if (total == needed) {
+                break; // Break if the needed number of blocks is allocated
             }
         }
     }
     spaceArray[index].start = -1;
     spaceArray[index].count = 0;
-    spushkin = realloc(spaceArray, (index+1)*sizeof(space));
-    for(int inner=0;inner<index;inner++){
-        for(int in=0;in<spaceArray[inner];in++){
-            setBit(spaceArray[inner].start+in);
+    spaceArray = realloc(spaceArray, (index + 1) * sizeof(space));
+    // Mark the allocated blocks in the bitmap
+    for (int inner = 0; inner < index; inner++) {
+        for (int in = 0; in < spaceArray[inner].count; in++) {
+            setBit(spaceArray[inner].start + in);
         }
     }
-    LBAwrite(freeSpace, freeSpaceBlocks, 1);
+    // Write the updated bitmap to disk
+    LBAwrite(freeSpace, freeSpaceBlocks, 1); 
     return spaceArray;
 }
+
 

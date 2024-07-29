@@ -95,7 +95,7 @@ struct fs_stat
 	};
 typedef struct parentInfo{
 	directoryEntry * parent;
-	char lastElement;
+	char *lastElement;
 	int index;
 } parentInfo;
 
