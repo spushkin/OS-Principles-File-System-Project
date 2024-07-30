@@ -13,15 +13,19 @@
 *
 **************************************************************/
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #include "FSFunctions.h"
 #include "fsLow.h"
 #include "constants.h"
 #include "initializeDirectories.h"
 
+#define MAX_SPACES 1024
+
 // Write directory information to disk
-int writeToDisk(directoryEntry *directory, space* freeSpace) {
-    int size = 1;
-    while (freeSpace[size].start != -1) {
+int writeToDisk(directoryEntry *directory, space *freeSpace) {
+    int size = 0;
+    while (freeSpace[size].start != -1 && size < MAX_SPACES) {
         size++;
     }
 
@@ -31,7 +35,6 @@ int writeToDisk(directoryEntry *directory, space* freeSpace) {
             directory->spaces[loop].count = freeSpace[loop].count;
             directory->spaces[loop].start = freeSpace[loop].start;
         }
-
         if (size < 4) {
             directory->spaces[size].count = -1;
             directory->spaces[size].start = -1;
@@ -39,8 +42,8 @@ int writeToDisk(directoryEntry *directory, space* freeSpace) {
     } else {
         // Handle large directories with multiple layers
         int sizeofSecondLayer = BLOCKSIZE / sizeof(space);
-        space *NodeofSecondLayer;
-        space *NodeofThirdLayer;
+        space *NodeofSecondLayer = NULL;
+        space *NodeofThirdLayer = NULL;
 
         int firstLayer = size < 4 ? size : 4;
         int leftover;
@@ -48,7 +51,8 @@ int writeToDisk(directoryEntry *directory, space* freeSpace) {
             if (loop == 4 - 1 && size > 4) {
                 NodeofSecondLayer = allocateBlocks(1, 1);
                 space *secondLayer = malloc(BLOCKSIZE);
-                if (secondLayer == NULL) {
+                if (secondLayer == NULL || NodeofSecondLayer == NULL) {
+                    free(secondLayer);
                     free(NodeofSecondLayer);
                     return 0;
                 }
@@ -100,8 +104,10 @@ int writeToDisk(directoryEntry *directory, space* freeSpace) {
 
                 thirdLayer[index] = NodeofSecondLayer->start;
                 space *secondLayer = malloc(BLOCKSIZE);
-                if (secondLayer == NULL) {
+                if (secondLayer == NULL || NodeofSecondLayer == NULL) {
+                    free(secondLayer);
                     free(NodeofSecondLayer);
+                    free(thirdLayer);
                     return 0;
                 }
                 int check = leftover < sizeofSecondLayer ? leftover : sizeofSecondLayer;
@@ -123,15 +129,18 @@ int writeToDisk(directoryEntry *directory, space* freeSpace) {
                 }
                 index++;
                 LBAwrite(secondLayer, 1, NodeofSecondLayer->start);
+                free(secondLayer);
+                free(NodeofSecondLayer);
             }
             LBAwrite(thirdLayer, 1, NodeofThirdLayer->start);
+            free(thirdLayer);
         }
     }
     return 1;
 }
 
 // Load space information from the directory
-space* loadSpace(directoryEntry *directory) {
+space *loadSpace(directoryEntry *directory) {
     int sizeOfLayer2 = BLOCKSIZE / sizeof(space);
     int sizeOfLayer3 = BLOCKSIZE / sizeof(int);
     int max = 4 + sizeOfLayer2 + sizeOfLayer3 + ((sizeOfLayer3 - 1) * sizeOfLayer2);
@@ -189,58 +198,53 @@ space* loadSpace(directoryEntry *directory) {
     sp[index].count = -1;
 
     sp = realloc(sp, (index + 1) * sizeof(space));
-    return sp; 
+    return sp;
 }
 
 // Initialize a new directory
 int initDir(int directoryEntries, directoryEntry *parent) {
     int sizeOfDirectoryEntry = sizeof(directoryEntry);
     int bytesNeeded = directoryEntries * sizeOfDirectoryEntry;
-    int blocks = (bytesNeeded + (BLOCKSIZE - 1)) / BLOCKSIZE;
-    bytesNeeded = blocks * BLOCKSIZE;
-    directoryEntries = (bytesNeeded + (sizeOfDirectoryEntry - 1)) / sizeOfDirectoryEntry;
-    directoryEntry *directory = malloc(bytesNeeded);
+    int blocks = (bytesNeeded + BLOCKSIZE - 1) / BLOCKSIZE;
 
-    if (directory == NULL) {
+    space *sp = allocateBlocks(1, blocks);
+    if (sp == NULL) {
         return -1;
     }
 
-    // Initialize directory entries
-    for (int loop = 0; loop < directoryEntries; loop++) {
-        directory[loop].file_name[0] = '\0';
+    directoryEntry *directory = malloc(bytesNeeded);
+    if (directory == NULL) {
+        free(sp);
+        return -1;
     }
 
-    space *sp = allocateBlocks(blocks, 1);
-    int size = 1;
-    while (sp[size].start != -1) {
-        size++;
-    }
-
-    int startingBlock = sp->start;
-
-    // Create the current directory entry
-    strcpy(directory[0].file_name, ".");
+    memset(directory, 0, bytesNeeded);
+    int startingBlock = sp[0].start;
     directory[0].starting_block = startingBlock;
     directory[0].file_size_bytes = bytesNeeded;
     directory[0].isDir = 1;
     writeToDisk(&directory[0], sp);
 
     // Create the parent directory entry
-    directoryEntry *parentEntry;
-    if (parent != NULL) {
-        parentEntry = parent;
+    strcpy(directory[1].file_name, "..");
+    if (parent == NULL) {
+        directory[1].starting_block = directory[0].starting_block;
+        directory[1].file_size_bytes = directory[0].file_size_bytes;
     } else {
-        parentEntry = &directory[0];
+        directory[1].starting_block = parent->starting_block;
+        directory[1].file_size_bytes = parent->file_size_bytes;
+    }
+    directory[1].isDir = 1;
+    writeToDisk(&directory[1], sp);
+
+    // Write directory entries to disk
+    int result = LBAwrite(directory, blocks, startingBlock);
+    if (result != blocks) {
+        free(directory);
+        free(sp);
+        return -1;
     }
 
-    strcpy(directory[1].file_name, "..");
-    directory[1].starting_block = parentEntry->starting_block;
-    directory[1].file_size_bytes = parentEntry->file_size_bytes;
-    directory[1].isDir = parentEntry->isDir;
-    memcpy(directory[1].spaces, parentEntry->spaces, sizeof(parentEntry->spaces));
-    
-    // Write the directory to disk
-    LBAwrite(directory, blocks, startingBlock);
     free(directory);
     free(sp);
     return startingBlock;

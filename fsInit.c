@@ -1,20 +1,3 @@
-/**************************************************************
-* Class::  CSC-415-01 Summer 2024
-* Name:: Yahya Obeid, Siarhei Pushkin, Philip Karnatsevich
-* Student IDs:: 922368561, 922907437, 922912455
-* GitHub-Name:: yahyaobeid, spushkin, kapitoshcka
-* Group-Name:: Team of 3
-* Project:: Basic File System
-*
-* File:: fsInit.c
-*
-* Description:: Main driver for file system assignment.
-*
-* This file is where you will start and initialize your system
-*
-**************************************************************/
-
-
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -44,7 +27,7 @@ int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize) {
 
     // Check if the volume is already formatted
     if(vcpPoint->signature == VCB_SIGNATURE){
-        printf("Volume already formatted");
+        printf("Volume already formatted\n");
     } else {
         // Initialize volume control block
         vcpPoint->signature = VCB_SIGNATURE;
@@ -59,6 +42,8 @@ int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize) {
     LBAread(root, 1, vcpPoint->rootDirectoryBlock);
     rootDirectory = loadDir(root);
     cwd = rootDirectory;
+
+    printf("initFileSystem: rootDirectory %p, cwd %p\n", (void*)rootDirectory, (void*)cwd);
 
     // Write the volume control block to disk
     LBAwrite(vcpPoint, 1, 0);

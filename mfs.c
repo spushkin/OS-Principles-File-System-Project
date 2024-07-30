@@ -155,7 +155,13 @@ int fs_mkdir(const char *pathname, mode_t mode) {
     }
     parent->parent[index] = newDirectory;
     int blocks = parent->parent->file_size_bytes / BLOCKSIZE;
-    LBAwrite(parent->parent, blocks, parent->parent->starting_block);
+    int result = LBAwrite(parent->parent, blocks, parent->parent->starting_block);
+    if (result != blocks) {
+        free(direct);
+        free(parent);
+        free(path);
+        return -1;
+    }
     free(direct);
     free(parent->lastElement);
     free(parent);
@@ -319,7 +325,6 @@ char* cleanPath(char* path) {
     while (token != NULL) {
         arrayOfTokens[index] = (char*)malloc(strlen(token) + 1);
         if (arrayOfTokens[index] == NULL) {
-            printf("Could not allocate memory for Token Array\n");
             return NULL;
         }
         if (strcmp(token, "..") == 0) {
@@ -473,4 +478,3 @@ struct fs_diriteminfo *fs_readdir(fdDir *dirp) {
 
     return dirp->di;
 }
-

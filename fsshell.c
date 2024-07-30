@@ -373,22 +373,25 @@ int cmd_mv (int argcnt, char *argvec[])
 *  Make Directory commmand
 ****************************************************/
 // Make Directory	
-int cmd_md (int argcnt, char *argvec[])
-	{
-#if (CMDMD_ON == 1)				
-	if (argcnt != 2)
-		{
-		printf("Usage: md pathname\n");
-		return -1;
-		}
-	else
-		{
-		return(fs_mkdir(argvec[1], 0777));
-		}
+int cmd_md (int argcnt, char *argvec[]) {
+#if (CMDMD_ON == 1)
+    if (argcnt != 2) {
+        printf("Usage: md pathname\n");
+        return -1;
+    } else {
+        printf("cmd_md: Creating directory %s\n", argvec[1]);
+        int result = fs_mkdir(argvec[1], 0777);
+        if (result == -1) {
+            printf("Error: Unable to create directory %s\n", argvec[1]);
+            return -1;
+        }
+        printf("cmd_md: Directory %s created successfully\n", argvec[1]);
+    }
 #endif
-	return -1;
-	}
-	
+    return 0;
+}
+
+
 /****************************************************
 *  Remove directory or file commmand
 ****************************************************/

@@ -98,10 +98,14 @@ int loadFreeSpace(int numofBlocks, int blockSize) {
 
 // Allocate blocks of free space
 space *allocateBlocks(int min, int needed) {
+    printf("allocateBlocks: Allocating %d blocks with a minimum of %d\n", needed, min);
+
     space *spaceArray = malloc(needed * sizeof(space));
     if (spaceArray == NULL) {
+        printf("Error: Memory allocation for spaceArray failed\n");
         return NULL;
     }
+
     int index = 0;
     int loop = 0;
     int total = 0;
@@ -113,14 +117,13 @@ space *allocateBlocks(int min, int needed) {
         } else {
             int count = 1; // Count of contiguous free blocks
             int inner = loop + 1;
-            // Find contiguous free blocks
             while (inner < totalBits && checkBit(inner) != 1 && total + count < needed) {
                 count++;
                 inner++;
             }
             if (count >= min) {
                 total += count;
-                spaceArray[index].start = loop; 
+                spaceArray[index].start = loop;
                 spaceArray[index].count = count;
                 index++;
             }
@@ -130,10 +133,15 @@ space *allocateBlocks(int min, int needed) {
             }
         }
     }
+
     spaceArray[index].start = -1;
     spaceArray[index].count = 0;
     spaceArray = realloc(spaceArray, (index + 1) * sizeof(space));
-    // Mark the allocated blocks in the bitmap
+    if (spaceArray == NULL) {
+        printf("Error: Memory reallocation for spaceArray failed\n");
+        return NULL;
+    }
+
     for (int inner = 0; inner < index; inner++) {
         for (int in = 0; in < spaceArray[inner].count; in++) {
             setBit(spaceArray[inner].start + in);
@@ -143,5 +151,3 @@ space *allocateBlocks(int min, int needed) {
     LBAwrite(freeSpace, freeSpaceBlocks, 1); 
     return spaceArray;
 }
-
-

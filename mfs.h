@@ -30,6 +30,8 @@
 #define FT_DIRECTORY DT_DIR
 #define FT_LINK	DT_LNK
 
+#define MAX_ENTRIES_PER_DIRECTORY 50
+
 #ifndef uint64_t
 typedef u_int64_t uint64_t;
 #endif
