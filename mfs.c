@@ -40,12 +40,24 @@ int isFile(directoryEntry* parent) {
 
 // Load directory entries from disk
 directoryEntry* loadDir(directoryEntry* parent) {
+    if (parent == NULL) {
+        printf("Error: parent is NULL in loadDir\n");
+        return NULL;
+    }
+
     directoryEntry* directory = malloc(parent->file_size_bytes);
     if (directory == NULL) {
+        printf("Error: Memory allocation failed in loadDir\n");
         return NULL;
     }
 
     space* sp = loadSpace(parent); // Load the space information
+    if (sp == NULL) {
+        printf("Error: loadSpace failed in loadDir\n");
+        free(directory);
+        return NULL;
+    }
+
     int index = 0;
 
     // Read directory entries from disk
@@ -172,23 +184,37 @@ int fs_mkdir(const char *pathname, mode_t mode) {
 // Remove a directory
 int fs_rmdir(const char *pathname) {
     parentInfo *parent = malloc(sizeof(parentInfo));
+    if (!parent) {
+        printf("Error: Memory allocation failed for parent in fs_rmdir\n");
+        return -1;
+    }
+
     char* path = strdup(pathname);
+    if (!path) {
+        printf("Error: Memory allocation failed for path in fs_rmdir\n");
+        free(parent);
+        return -1;
+    }
+
     int value = parsePath(path, parent);
-    if (value == -1 || value == -2 || parent->index == -1 || parent->index < 2 || 
-                fs_isDir(path) != 1 || isDirAtDeEmpty(&parent->parent[parent->index]) == -1) {
+    if (value == -1 || value == -2 || parent->index == -1 || parent->index < 2 ||
+        fs_isDir(path) != 1 || isDirAtDeEmpty(&parent->parent[parent->index]) == -1) {
         free(parent);
         free(path);
         return -1;
     }
+
     space* sp = loadSpace(&parent->parent[parent->index]);
     int index = 0;
     while (sp[index].start != -1) {
         clearBits(sp[index].start, sp[index].count);
         index++;
     }
+
     strcpy(parent->parent[parent->index].file_name, "\0");
     int blocksUsed = parent->parent->file_size_bytes / BLOCKSIZE;
     LBAwrite(parent->parent, blocksUsed, parent->parent->starting_block);
+
     free(sp);
     free(parent);
     free(path);
@@ -198,7 +224,18 @@ int fs_rmdir(const char *pathname) {
 // Check if the given path is a directory
 int fs_isDir(char *pathname) {
     parentInfo *parent = malloc(sizeof(parentInfo));
+    if (!parent) {
+        printf("Error: Memory allocation failed for parent in fs_isDir\n");
+        return -1;
+    }
+
     char* path = strdup(pathname);
+    if (!path) {
+        printf("Error: Memory allocation failed for path in fs_isDir\n");
+        free(parent);
+        return -1;
+    }
+
     int value = parsePath(path, parent);
     if (value != 0) {
         free(parent);
@@ -221,7 +258,18 @@ int fs_isDir(char *pathname) {
 // Check if the given path is a file
 int fs_isFile(char *pathname) {
     parentInfo *parent = malloc(sizeof(parentInfo));
+    if (!parent) {
+        printf("Error: Memory allocation failed for parent in fs_isFile\n");
+        return -1;
+    }
+
     char* path = strdup(pathname);
+    if (!path) {
+        printf("Error: Memory allocation failed for path in fs_isFile\n");
+        free(parent);
+        return -1;
+    }
+
     int value = parsePath(path, parent);
     if (value == 0 && parent->index != -1) {
         directoryEntry *directory = &(parent->parent[parent->index]);
@@ -239,13 +287,25 @@ int fs_isFile(char *pathname) {
 // Delete a file
 int fs_delete(char* filename) {
     parentInfo *parent = malloc(sizeof(parentInfo));
+    if (!parent) {
+        printf("Error: Memory allocation failed for parent in fs_delete\n");
+        return -1;
+    }
+
     char* path = strdup(filename);
+    if (!path) {
+        printf("Error: Memory allocation failed for path in fs_delete\n");
+        free(parent);
+        return -1;
+    }
+
     int value = parsePath(path, parent);
     if (value != 0 || parent->index == -1 || fs_isFile(path) != 1) {
         free(parent);
         free(path);
         return -1;
     }
+
     space* sp = loadSpace(&parent->parent[parent->index]);
     int index = 0;
     strcpy(parent->parent[parent->index].file_name, "\0");
@@ -253,8 +313,10 @@ int fs_delete(char* filename) {
         clearBits(sp[index].start, sp[index].count);
         index++;
     }
+
     int blocks = parent->parent->file_size_bytes / BLOCKSIZE;
     LBAwrite(parent->parent, blocks, parent->parent->starting_block);
+
     free(sp);
     free(parent);
     free(path);
@@ -286,6 +348,11 @@ int fs_setcwd(char *pathname) {
         free(cwd);
     }
     cwd = loadDir(&(parent->parent[parent->index]));
+    if (cwd == NULL) {
+        free(parent);
+        free(path);
+        return -1;
+    }
     char* new;
     if (path[0] == '/') {
         new = path;
