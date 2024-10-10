@@ -1,7 +1,6 @@
 /**************************************************************
 * Class::  CSC-415-01 Summer 2024
 * Name:: Yahya Obeid, Siarhei Pushkin, Philip Karnatsevich
-* Student IDs:: 922368561, 922907437, 922912455
 * GitHub-Name:: yahyaobeid, spushkin, kapitoshcka
 * Group-Name:: Team of 3
 * Project:: Basic File System
